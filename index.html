@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>うんち日記</title>
+<meta name="description" content="子どものうんちを形と色で毎日記録。便秘・下痢の傾向がひと目でわかる無料アプリ。">
+<meta name="theme-color" content="#fbf6ee">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="うんち日記">
+<style>
+:root{
+  --bg:#fbf6ee; --card:#fff; --ink:#2f2620; --sub:#7a6a5d; --line:#eadfce;
+  --accent:#d9573b; --good:#3c8d5a; --goodbg:#e7f3ea; --warn:#b4621b; --warnbg:#fbeedd;
+  --c1:#E9A54B; --c2:#B57B48; --c3:#965A3C; --c4:#64412E; --c5:#2B2320;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent}
+header{padding:16px 16px 8px;max-width:560px;margin:0 auto}
+h1{font-size:22px;margin:0 0 10px;letter-spacing:.04em}
+h1 span{color:var(--accent)}
+.kids{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;font-size:15px;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip.add{color:var(--sub);border-style:dashed}
+.addbox{display:none;gap:6px;margin-top:8px}
+.addbox.show{display:flex}
+.addbox input{flex:1}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav .in{max-width:560px;margin:0 auto;display:flex}
+nav button{flex:1;border:0;background:none;padding:12px 0;font-size:15px;color:var(--sub);border-bottom:3px solid transparent;cursor:pointer;font-family:inherit}
+nav button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+main{max-width:560px;margin:0 auto;padding:14px 14px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:16px;margin:0 0 10px}
+.lbl{font-size:13px;color:var(--sub);margin:14px 0 6px;font-weight:700}
+.lbl:first-child{margin-top:0}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+input[type=date],input[type=time],input[type=text],textarea{width:100%;font:inherit;font-size:16px;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:60px;resize:vertical}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.opt{border:2px solid var(--line);border-radius:12px;background:#fff;padding:8px 4px 6px;text-align:center;cursor:pointer;font-size:12.5px;color:var(--ink);font-family:inherit}
+.opt svg{display:block;margin:0 auto 2px;width:56px;height:38px}
+.opt.on{border-color:var(--accent);background:#fff4ef;box-shadow:0 0 0 2px #f6c9bb inset}
+.opt small{display:block;color:var(--sub);font-size:10.5px;margin-top:1px}
+.sw{width:34px;height:34px;border-radius:50%;margin:0 auto 4px;border:2px solid rgba(0,0,0,.12)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg .opt{flex:1;min-width:70px;font-size:14px;padding:10px 4px}
+.verdict{border-radius:12px;padding:12px;margin-top:14px;font-size:14px;line-height:1.6;display:none}
+.verdict.show{display:block}
+.verdict.good{background:var(--goodbg);color:#1f5a36}
+.verdict.warn{background:var(--warnbg);color:#7a3f0d}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;background:var(--accent);color:#fff;margin-top:14px;cursor:pointer;font-family:inherit}
+.btn:disabled{opacity:.4}
+.btn.sub{background:#fff;color:var(--ink);border:1.5px solid var(--line);font-weight:500}
+.btn.small{display:inline-block;width:auto;padding:8px 14px;font-size:14px;margin:0}
+.entry{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px dashed var(--line)}
+.entry:first-of-type{border-top:0}
+.entry svg{width:52px;height:35px;flex:none}
+.entry .t{flex:1;font-size:14px;line-height:1.45}
+.entry .t b{font-size:15px}
+.entry .t .m{color:var(--sub);font-size:12.5px}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;margin-left:4px;vertical-align:1px}
+.tag.g{background:var(--goodbg);color:var(--good)}
+.tag.w{background:var(--warnbg);color:var(--warn)}
+.tag.p{background:#fde3e3;color:#b23030}
+.del{border:0;background:none;color:#b9a99a;font-size:20px;cursor:pointer;padding:4px 8px}
+.empty{color:var(--sub);font-size:14px;text-align:center;padding:10px 0}
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-head button{border:1.5px solid var(--line);background:#fff;border-radius:10px;width:40px;height:34px;font-size:16px;cursor:pointer}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dow{font-size:11px;text-align:center;color:var(--sub);padding-bottom:2px}
+.day{aspect-ratio:1/1.1;border-radius:10px;background:#faf6f0;border:1.5px solid transparent;font-size:12px;padding:3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.day.blank{background:none;cursor:default}
+.day.today{border-color:var(--ink)}
+.day.sel{background:#fff4ef;border-color:var(--accent)}
+.day.good{background:var(--goodbg)}
+.day.none{color:#c7b8aa}
+.dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.dot{width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,.15)}
+.dot.pain{outline:2px solid #e05555;outline-offset:0}
+.legend{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.6}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#faf6f0;border-radius:12px;padding:10px 6px;text-align:center}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:11.5px;color:var(--sub)}
+.bar{display:flex;height:22px;border-radius:8px;overflow:hidden;margin:4px 0 2px;background:#f1ebe2}
+.bar div{height:100%}
+.barl{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:var(--sub)}
+.barl i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:0}
+.advice{font-size:14px;line-height:1.7}
+.advice li{margin-bottom:6px}
+.alert{background:#fde8e6;color:#8a2a1e;border-radius:12px;padding:12px;font-size:13.5px;line-height:1.65}
+.alert b{display:block;margin-bottom:4px}
+.note{font-size:12.5px;color:var(--sub);line-height:1.6}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;transition:.25s;z-index:20;opacity:0}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.savebar{font-size:12px;color:var(--sub);text-align:center;margin-top:6px}
+.hide{display:none}
+pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10px;padding:10px;max-height:200px;overflow:auto}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>うんち<span>日記</span></h1>
+  <div class="kids" id="kids"></div>
+  <div class="addbox" id="addbox">
+    <input type="text" id="newkid" placeholder="名前（例：たろう）" maxlength="12">
+    <button class="btn small" id="addkid">追加</button>
+  </div>
+</header>
+
+<nav><div class="in">
+  <button data-tab="rec" class="on">記録する</button>
+  <button data-tab="cal">カレンダー</button>
+  <button data-tab="sum">ふりかえり</button>
+  <button data-tab="share">共有</button>
+</div></nav>
+
+<main>
+  <!-- 記録 -->
+  <section id="tab-rec">
+    <div class="card">
+      <div class="lbl">日時</div>
+      <div class="row"><input type="date" id="fDate"><input type="time" id="fTime"></div>
+
+      <div class="lbl">かたち</div>
+      <div class="grid" id="fShape"></div>
+
+      <div class="lbl">いろ</div>
+      <div class="grid5" id="fColor"></div>
+
+      <div class="lbl">におい</div>
+      <div class="seg" id="fSmell"></div>
+
+      <div class="lbl">おなか</div>
+      <div class="seg" id="fPain"></div>
+
+      <div class="lbl">メモ（食べたもの・様子など）</div>
+      <textarea id="fMemo" placeholder="例：昨日アイス2個、朝ごはん少なめ"></textarea>
+
+      <div class="verdict" id="verdict"></div>
+      <button class="btn" id="save" disabled>記録する</button>
+      <div class="savebar" id="savebar"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="todayTitle">今日の記録</h2>
+      <div id="todayList"></div>
+      <button class="btn sub" id="noPoop">今日は出なかった（記録）</button>
+    </div>
+  </section>
+
+  <!-- カレンダー -->
+  <section id="tab-cal" class="hide">
+    <div class="card">
+      <div class="cal-head">
+        <button id="prevM">‹</button><b id="mTitle"></b><button id="nextM">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="legend">点の色＝うんちの色　／　緑のマス＝よいウンチだけの日　／　赤い縁＝おなかが痛かった　／　グレーの日付＝記録なし</div>
+    </div>
+    <div class="card">
+      <h2 id="dayTitle">日付をタップ</h2>
+      <div id="dayList"></div>
+    </div>
+  </section>
+
+  <!-- まとめ -->
+  <section id="tab-sum" class="hide">
+    <div class="card">
+      <div class="seg" id="range" style="margin-bottom:12px"></div>
+      <div class="stats" id="stats"></div>
+      <div class="lbl" style="margin-top:16px">かたちの内訳</div>
+      <div class="bar" id="shapeBar"></div><div class="barl" id="shapeLeg"></div>
+      <div class="lbl">いろの内訳</div>
+      <div class="bar" id="colorBar"></div><div class="barl" id="colorLeg"></div>
+    </div>
+    <div class="card">
+      <h2>この期間のヒント</h2>
+      <ul class="advice" id="advice"></ul>
+    </div>
+    <div class="card">
+      <div class="alert">
+        <b>こんな時は小児科へ</b>
+        血が混じる・黒いタール状・白っぽい灰色のうんち／強い腹痛、発熱や嘔吐をともなう／下痢が続いて水分がとれない、おしっこが減った／便秘で何日も出ず、お腹が張って苦しそう・食欲がない
+      </div>
+      <p class="note">この記録は受診時に見せると役立ちます。下のボタンで一覧をコピーできます。</p>
+      <button class="btn sub" id="exportBtn">記録をテキストでコピー</button>
+      <pre class="exp hide" id="expOut"></pre>
+    </div>
+  </section>
+  <!-- 共有 -->
+  <section id="tab-share" class="hide">
+    <div class="card">
+      <h2>記録はこの端末の中だけに保存されます</h2>
+      <p class="note">サーバーには送信されません。ブラウザのデータを消去すると記録も消えるので、<b>ホーム画面に追加</b>して使い、ときどき下の「バックアップ」をしてください。</p>
+      <div class="lbl">入力する人の名前（記録に表示されます）</div>
+      <input type="text" id="meName" placeholder="例：パパ、ママ" maxlength="10">
+    </div>
+    <div class="card">
+      <h2>家族と記録をまとめる</h2>
+      <p class="note">① 片方の端末で「共有コードを作る」→ LINEなどで送る<br>② もう片方で受け取ったリンクを開くか、コードを貼り付けて「取り込む」<br>同じ記録は重ならず、両方の記録が1つにまとまります。お互いに送り合うと2台とも同じ内容になります。</p>
+      <button class="btn" id="makeCode">共有コードを作る</button>
+      <div id="codeBox" class="hide">
+        <div class="lbl" id="codeInfo"></div>
+        <textarea id="codeOut" readonly style="font-size:12px;min-height:80px"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sub" id="copyCode" style="margin-top:0">コードをコピー</button>
+          <button class="btn sub" id="shareLink" style="margin-top:0">リンクで送る</button>
+        </div>
+      </div>
+      <div class="lbl" style="margin-top:18px">受け取ったコードを貼り付け</div>
+      <textarea id="codeIn" placeholder="UNCHI1… で始まるコード" style="font-size:12px"></textarea>
+      <button class="btn sub" id="importBtn">取り込む</button>
+      <p class="note" id="importMsg"></p>
+    </div>
+    <div class="card">
+      <h2>バックアップ</h2>
+      <p class="note">機種変更のときや念のために、記録をファイルに保存・復元できます。</p>
+      <div class="row">
+        <button class="btn sub" id="backupBtn" style="margin-top:0">ファイルに保存</button>
+        <label class="btn sub" style="margin-top:0;text-align:center">ファイルから復元<input type="file" id="restoreFile" accept=".txt,text/plain" hidden></label>
+      </div>
+    </div>
+    <p class="note" style="text-align:center">このアプリは記録の補助ツールで、診断を行うものではありません。<br>心配な症状があるときは小児科にご相談ください。</p>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+// ---------- マスタ ----------
+const SHAPES = [
+  {k:"koro",  n:"コロコロ", s:"かたい粒"},
+  {k:"kachi", n:"カチカチ", s:"かたい塊"},
+  {k:"banana",n:"バナナ",   s:"ほどよい"},
+  {k:"han",   n:"半ねり",   s:"やわらか"},
+  {k:"doro",  n:"どろどろ", s:"泥状"},
+  {k:"mizu",  n:"水っぽい", s:"水状"}
+];
+const COLORS = [
+  {k:"c1",n:"黄色",v:"#E9A54B"},
+  {k:"c2",n:"黄土色",v:"#B57B48"},
+  {k:"c3",n:"茶色",v:"#965A3C"},
+  {k:"c4",n:"こげ茶",v:"#64412E"},
+  {k:"c5",n:"黒っぽい",v:"#2B2320"}
+];
+const SMELLS = [{k:"good",n:"気にならない"},{k:"normal",n:"ふつう"},{k:"bad",n:"くさい"}];
+const PAINS  = [{k:"none",n:"痛くない"},{k:"some",n:"少し痛い"},{k:"hard",n:"とても痛い"}];
+const SHAPE_MAP = Object.fromEntries(SHAPES.map(x=>[x.k,x]));
+const COLOR_MAP = Object.fromEntries(COLORS.map(x=>[x.k,x]));
+const SMELL_MAP = Object.fromEntries(SMELLS.map(x=>[x.k,x]));
+const PAIN_MAP  = Object.fromEntries(PAINS.map(x=>[x.k,x]));
+const SHAPE_COL = {koro:"#7a5a44",kachi:"#a27a5c",banana:"#3c8d5a",han:"#79b58c",doro:"#e2a35a",mizu:"#d9573b"};
+
+// ---------- SVG ----------
+const ST = 'stroke="#3a2a20" stroke-width="1.8" stroke-linejoin="round"';
+function shapeSVG(k, fill){
+  fill = fill || "#B57B48";
+  let g = "";
+  switch(k){
+    case "koro":
+      g = [[12,12,5],[26,9,4.5],[40,12,5],[50,22,4.5],[18,26,5.5],[32,25,5],[44,32,4],[10,33,3.5]]
+        .map(([x,y,r])=>`<ellipse cx="${x}" cy="${y}" rx="${r+0.6}" ry="${r}" fill="${fill}" ${ST}/>`).join("");
+      break;
+    case "kachi":
+      g = `<path d="M6 16 Q10 6 22 9 Q30 7 33 13 Q34 21 24 22 Q14 25 8 21 Z" fill="${fill}" ${ST}/>
+           <path d="M24 28 Q28 19 41 22 Q52 20 54 27 Q55 35 44 35 Q32 38 26 34 Z" fill="${fill}" ${ST}/>`;
+      break;
+    case "banana":
+      g = `<path d="M7 31 Q30 31 49 8 Q55 4 54 11 Q44 35 16 37 Q4 37 7 31 Z" fill="${fill}" ${ST}/>`;
+      break;
+    case "han":
+      g = `<ellipse cx="30" cy="31" rx="20" ry="6.5" fill="${fill}" ${ST}/>
+           <ellipse cx="30" cy="23" rx="14" ry="5.5" fill="${fill}" ${ST}/>
+           <path d="M21 19 Q24 9 31 6 Q31 12 38 17 Q34 20 21 19 Z" fill="${fill}" ${ST}/>`;
+      break;
+    case "doro":
+      g = `<path d="M8 26 Q6 16 17 16 Q22 9 31 13 Q42 9 47 17 Q56 20 52 29 Q50 36 38 34 Q30 38 20 35 Q9 35 8 26 Z" fill="${fill}" ${ST}/>
+           <path d="M19 24 Q25 21 30 24 M33 28 Q38 25 43 27" fill="none" ${ST}/>`;
+      break;
+    case "mizu":
+      g = `<path d="M10 28 Q8 22 15 21 Q14 14 22 16 Q26 10 32 15 Q40 11 43 18 Q51 18 49 25 Q55 30 47 33 Q40 37 31 34 Q22 37 16 34 Q8 34 10 28 Z" fill="${fill}" ${ST}/>
+           <circle cx="6" cy="20" r="2" fill="${fill}" ${ST}/><circle cx="54" cy="15" r="2.2" fill="${fill}" ${ST}/><circle cx="56" cy="36" r="1.6" fill="${fill}" ${ST}/>`;
+      break;
+    case "nopoop":
+      g = `<circle cx="30" cy="20" r="12" fill="none" stroke="#c7b8aa" stroke-width="2" stroke-dasharray="3 3"/>
+           <text x="30" y="25" font-size="13" text-anchor="middle" fill="#a8988a">なし</text>`;
+      break;
+  }
+  return `<svg viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+}
+
+// ---------- 状態（この端末に保存） ----------
+const LS_KEY = "unchi-diary-v1";
+function lsGet(k){ try{ return localStorage.getItem(k);}catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+let state = {children:["こども"], entries:[], deleted:{}, me:""};
+(function load(){
+  const raw = lsGet(LS_KEY);
+  if(raw){ try{ const o=JSON.parse(raw); if(o && typeof o==="object") state=Object.assign(state,o); }catch(e){} }
+  if(!Array.isArray(state.children) || !state.children.length) state.children=["こども"];
+  if(!Array.isArray(state.entries)) state.entries=[];
+  if(!state.deleted || typeof state.deleted!=="object") state.deleted={};
+})();
+let currentKid = lsGet(LS_KEY+":kid") || state.children[0];
+if(!state.children.includes(currentKid)) currentKid = state.children[0];
+const readOnly = false;
+
+function save(){
+  if(!lsSet(LS_KEY, JSON.stringify(state))){ setSaveBar("保存できませんでした（プライベートブラウズでは保存されません）"); toast("保存できませんでした"); return false; }
+  return true;
+}
+async function writeEntry(e){ state.entries.push(e); return save(); }
+async function deleteEntry(id){
+  state.entries = state.entries.filter(x=>x.id!==id);
+  state.deleted[id] = Date.now();
+  return save();
+}
+async function saveSettings(){ save(); }
+function newId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function setSaveBar(t){ document.getElementById("savebar").textContent = t; }
+
+// ---------- ユーティリティ ----------
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const todayStr = () => ymd(new Date());
+const nowTime = () => { const d=new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const esc = s => String(s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const WD = ["日","月","火","水","木","金","土"];
+function fmtDate(s){ const [y,m,d]=s.split("-").map(Number); const dt=new Date(y,m-1,d); return `${m}/${d}(${WD[dt.getDay()]})`; }
+function toast(t){ const el=$("toast"); el.textContent=t; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),1800); }
+function kidEntries(){ return state.entries.filter(e=>e.child===currentKid); }
+
+function isGood(e){ return (e.shape==="banana"||e.shape==="han") && (e.color==="c1"||e.color==="c2"); }
+function judge(shape,color){
+  const msgs=[]; let good=true;
+  if(shape==="koro"||shape==="kachi"){ good=false; msgs.push("かため → 食物繊維や水分が足りていないかも。野菜・海藻・きのこ・豆、水分を意識して。"); }
+  if(shape==="doro"||shape==="mizu"){ good=false; msgs.push("ゆるめ → 冷たいもの・甘いものの摂りすぎ、食べすぎ、消化不良のサインかも。おなかを温め、消化のよい食事に。"); }
+  if(color==="c4"||color==="c5"){ good=false; msgs.push("色が濃い → 肉など動物性の食べものが多めかも。ごはん・野菜・発酵食品を増やしてみて。"); }
+  if(color==="c3" && good){ msgs.push("形は◎。もう少し黄色寄りになると腸内環境がさらに良い状態です。"); good=false; }
+  if(shape && color && isGood({shape,color})) return {good:true, html:"<b>よいウンチ！</b> 腸の調子が良さそうです。この調子で👍"};
+  return {good:false, html:msgs.join("<br>")};
+}
+
+// ---------- 子ども選択 ----------
+function renderKids(){
+  const box=$("kids");
+  box.innerHTML = state.children.map(c=>`<button class="chip ${c===currentKid?"on":""}" data-kid="${esc(c)}">${esc(c)}</button>`).join("")
+    + `<button class="chip add" id="kidAddBtn">＋ 追加</button>`;
+  box.querySelectorAll("[data-kid]").forEach(b=>b.onclick=()=>{ currentKid=b.dataset.kid; lsSet(LS_KEY+":kid",currentKid); renderAll(); });
+  $("kidAddBtn").onclick=()=>{ $("addbox").classList.toggle("show"); $("newkid").focus(); };
+}
+$("addkid").onclick=async()=>{
+  const v=$("newkid").value.trim(); if(!v) return;
+  if(!state.children.includes(v)){
+    // 最初の「こども」が未使用なら置き換え
+    if(state.children.length===1 && state.children[0]==="こども" && !state.entries.length) state.children=[v];
+    else state.children=state.children.concat([v]);
+  }
+  currentKid=v; lsSet(LS_KEY+":kid",v);
+  $("newkid").value=""; $("addbox").classList.remove("show");
+  renderAll(); await saveSettings();
+};
+
+// ---------- 記録フォーム ----------
+const form = {shape:null,color:null,smell:"normal",pain:"none"};
+function renderForm(){
+  $("fShape").innerHTML = SHAPES.map(s=>`<button class="opt ${form.shape===s.k?"on":""}" data-v="${s.k}">${shapeSVG(s.k, form.color?COLOR_MAP[form.color].v:"#B57B48")}${s.n}<small>${s.s}</small></button>`).join("");
+  $("fColor").innerHTML = COLORS.map(c=>`<button class="opt ${form.color===c.k?"on":""}" data-v="${c.k}"><div class="sw" style="background:${c.v}"></div>${c.n}</button>`).join("");
+  $("fSmell").innerHTML = SMELLS.map(c=>`<button class="opt ${form.smell===c.k?"on":""}" data-v="${c.k}">${c.n}</button>`).join("");
+  $("fPain").innerHTML  = PAINS.map(c=>`<button class="opt ${form.pain===c.k?"on":""}" data-v="${c.k}">${c.n}</button>`).join("");
+  bindOpts("fShape","shape"); bindOpts("fColor","color"); bindOpts("fSmell","smell"); bindOpts("fPain","pain");
+  const v=$("verdict");
+  if(form.shape && form.color){
+    const j=judge(form.shape,form.color);
+    v.className="verdict show "+(j.good?"good":"warn"); v.innerHTML=j.html;
+  } else { v.className="verdict"; }
+  $("save").disabled = !(form.shape && form.color) || readOnly;
+}
+function bindOpts(id,key){ $(id).querySelectorAll(".opt").forEach(b=>b.onclick=()=>{ form[key]=b.dataset.v; renderForm(); }); }
+
+let busy=false;
+$("save").onclick=async()=>{
+  if(busy) return; busy=true; $("save").disabled=true; setSaveBar("保存中…");
+  const e={ id:newId(), child:currentKid,
+    date:$("fDate").value||todayStr(), time:$("fTime").value||"", shape:form.shape, color:form.color,
+    smell:form.smell, pain:form.pain, memo:$("fMemo").value.trim(), by:state.me||"", at:Date.now() };
+  // 同じ日の「出なかった」記録は削除
+  const old = state.entries.filter(x=>x.child===currentKid && x.date===e.date && x.shape==="nopoop");
+  for(const o of old) await deleteEntry(o.id);
+  const ok = await writeEntry(e);
+  busy=false;
+  if(ok){
+    form.shape=null; form.color=null; form.smell="normal"; form.pain="none"; $("fMemo").value="";
+    toast("記録しました"); setSaveBar("");
+  }
+  renderAll();
+};
+$("noPoop").onclick=async()=>{
+  const d=$("fDate").value||todayStr();
+  const has = state.entries.some(x=>x.child===currentKid && x.date===d);
+  if(has){ toast("この日はすでに記録があります"); return; }
+  const ok = await writeEntry({id:newId(), child:currentKid, date:d, time:"", shape:"nopoop", color:"", smell:"", pain:form.pain, memo:$("fMemo").value.trim(), by:state.me||"", at:Date.now()});
+  if(ok){ $("fMemo").value=""; toast("「出なかった」を記録しました"); }
+  renderAll();
+};
+
+function byText(e){ return e.by ? `<div class="m">入力：${esc(e.by)}</div>` : ""; }
+function entryHTML(e){
+  if(e.shape==="nopoop"){
+    return `<div class="entry">${shapeSVG("nopoop")}<div class="t"><b>出なかった</b>${e.pain!=="none"&&e.pain&&PAIN_MAP[e.pain]?`<span class="tag p">${PAIN_MAP[e.pain].n}</span>`:""}${e.memo?`<div class="m">${esc(e.memo)}</div>`:""}${byText(e)}</div><button class="del" data-del="${esc(e.id)}" aria-label="削除">×</button></div>`;
+  }
+  const s=SHAPE_MAP[e.shape], c=COLOR_MAP[e.color];
+  const good=isGood(e);
+  return `<div class="entry">${shapeSVG(e.shape,c?c.v:"")}<div class="t">
+    <b>${e.time?esc(e.time)+" ":""}${s?s.n:""}・${c?c.n:""}</b>${good?'<span class="tag g">よいウンチ</span>':'<span class="tag w">要チェック</span>'}${e.pain&&e.pain!=="none"?`<span class="tag p">${PAIN_MAP[e.pain].n}</span>`:""}
+    <div class="m">におい：${SMELL_MAP[e.smell]?SMELL_MAP[e.smell].n:"-"}${e.memo?"　"+esc(e.memo):""}</div>${byText(e)}</div>
+    <button class="del" data-del="${esc(e.id)}" aria-label="削除">×</button></div>`;
+}
+const pendingDel = {};
+function bindDel(root){
+  root.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.del;
+    if(!pendingDel[id]){ pendingDel[id]=1; b.textContent="削除?"; b.style.color="#d9573b"; b.style.fontSize="13px"; setTimeout(()=>{delete pendingDel[id]; b.textContent="×"; b.style.color=""; b.style.fontSize="";},2500); return; }
+    deleteEntry(id).then(ok=>{ if(ok) toast("削除しました"); renderAll(); });
+  });
+}
+function sortEntries(a){ return a.slice().sort((x,y)=>(x.date+x.time).localeCompare(y.date+y.time)); }
+
+function renderToday(){
+  const d=$("fDate").value||todayStr();
+  $("todayTitle").textContent = (d===todayStr()?"今日":fmtDate(d))+"の記録（"+currentKid+"）";
+  const list=sortEntries(kidEntries().filter(e=>e.date===d));
+  $("todayList").innerHTML = list.length? list.map(entryHTML).join("") : '<div class="empty">まだ記録がありません</div>';
+  bindDel($("todayList"));
+}
+$("fDate").onchange=renderToday;
+
+// ---------- カレンダー ----------
+let calY, calM, selDay=null;
+(function(){ const d=new Date(); calY=d.getFullYear(); calM=d.getMonth(); })();
+$("prevM").onclick=()=>{ calM--; if(calM<0){calM=11;calY--;} renderCal(); };
+$("nextM").onclick=()=>{ calM++; if(calM>11){calM=0;calY++;} renderCal(); };
+function renderCal(){
+  $("mTitle").textContent=`${calY}年${calM+1}月`;
+  const first=new Date(calY,calM,1).getDay(), days=new Date(calY,calM+1,0).getDate();
+  const byDay={}; kidEntries().forEach(e=>{ (byDay[e.date]=byDay[e.date]||[]).push(e); });
+  let h=WD.map(w=>`<div class="dow">${w}</div>`).join("");
+  for(let i=0;i<first;i++) h+='<div class="day blank"></div>';
+  const t=todayStr();
+  for(let d=1;d<=days;d++){
+    const ds=`${calY}-${pad(calM+1)}-${pad(d)}`, es=byDay[ds]||[];
+    const real=es.filter(e=>e.shape!=="nopoop");
+    const good = real.length && real.every(isGood);
+    const cls=["day"]; if(ds===t)cls.push("today"); if(ds===selDay)cls.push("sel"); if(good)cls.push("good"); if(!es.length)cls.push("none");
+    const dots=es.map(e=> e.shape==="nopoop"
+      ? `<span class="dot ${e.pain&&e.pain!=="none"?"pain":""}" style="background:#fff;border:1px dashed #b9a99a"></span>`
+      : `<span class="dot ${e.pain&&e.pain!=="none"?"pain":""}" style="background:${COLOR_MAP[e.color]?COLOR_MAP[e.color].v:"#ccc"}"></span>`).join("");
+    h+=`<div class="${cls.join(" ")}" data-d="${ds}">${d}<div class="dots">${dots}</div></div>`;
+  }
+  $("cal").innerHTML=h;
+  $("cal").querySelectorAll("[data-d]").forEach(el=>el.onclick=()=>{ selDay=el.dataset.d; renderCal(); });
+  renderDay();
+}
+function renderDay(){
+  if(!selDay){ $("dayTitle").textContent="日付をタップすると記録が見られます"; $("dayList").innerHTML=""; return; }
+  $("dayTitle").textContent=fmtDate(selDay)+"の記録";
+  const list=sortEntries(kidEntries().filter(e=>e.date===selDay));
+  $("dayList").innerHTML = (list.length? list.map(entryHTML).join("") : '<div class="empty">記録なし</div>')
+    + `<button class="btn sub" id="addForDay">この日の記録を追加</button>`;
+  bindDel($("dayList"));
+  $("addForDay").onclick=()=>{ $("fDate").value=selDay; $("fTime").value=""; switchTab("rec"); };
+}
+
+// ---------- ふりかえり ----------
+let rangeDays=14;
+function renderSum(){
+  $("range").innerHTML=[7,14,30].map(n=>`<button class="opt ${n===rangeDays?"on":""}" data-n="${n}">${n}日間</button>`).join("");
+  $("range").querySelectorAll(".opt").forEach(b=>b.onclick=()=>{rangeDays=+b.dataset.n; renderSum();});
+  const end=new Date(); const start=new Date(); start.setDate(end.getDate()-rangeDays+1);
+  const sStr=ymd(start), eStr=ymd(end);
+  const inR=kidEntries().filter(e=>e.date>=sStr && e.date<=eStr);
+  const real=inR.filter(e=>e.shape!=="nopoop");
+  const daysWith=new Set(real.map(e=>e.date));
+  const goodN=real.filter(isGood).length;
+  const painN=inR.filter(e=>e.pain&&e.pain!=="none").length;
+  // 連続で出ていない日数（今日から遡る）
+  const allDays=new Set(kidEntries().filter(e=>e.shape!=="nopoop").map(e=>e.date));
+  let streak=0; const c=new Date();
+  for(let i=0;i<60;i++){ if(allDays.has(ymd(c))) break; streak++; c.setDate(c.getDate()-1); }
+  if(!kidEntries().length) streak=0;
+  $("stats").innerHTML=`
+    <div class="stat"><b>${daysWith.size}<small style="font-size:12px">/${rangeDays}日</small></b><span>出た日</span></div>
+    <div class="stat"><b>${real.length?Math.round(goodN/real.length*100):0}<small style="font-size:12px">%</small></b><span>よいウンチ率</span></div>
+    <div class="stat"><b>${painN}<small style="font-size:12px">回</small></b><span>腹痛あり</span></div>`;
+  // バー
+  const bar=(items,key,colorOf,nameOf,barId,legId)=>{
+    const cnt={}; real.forEach(e=>cnt[e[key]]=(cnt[e[key]]||0)+1);
+    const tot=real.length||1;
+    $(barId).innerHTML=items.map(it=>cnt[it.k]?`<div style="width:${cnt[it.k]/tot*100}%;background:${colorOf(it)}"></div>`:"").join("");
+    $(legId).innerHTML=items.filter(it=>cnt[it.k]).map(it=>`<span><i style="background:${colorOf(it)}"></i>${nameOf(it)} ${cnt[it.k]}</span>`).join("") || "<span>記録がありません</span>";
+  };
+  bar(SHAPES,"shape",it=>SHAPE_COL[it.k],it=>it.n,"shapeBar","shapeLeg");
+  bar(COLORS,"color",it=>it.v,it=>it.n,"colorBar","colorLeg");
+  // ヒント
+  const n=k=>real.filter(e=>e.shape===k).length;
+  const hard=n("koro")+n("kachi"), soft=n("doro")+n("mizu"), dark=real.filter(e=>e.color==="c4"||e.color==="c5").length;
+  const adv=[];
+  if(!real.length && !inR.length){ adv.push("まずは毎日記録してみましょう。1〜2週間たまると傾向が見えてきます。"); }
+  else{
+    if(streak>=3) adv.push(`<b>${streak}日間出ていません。</b>水分・食物繊維を意識し、お腹が張って苦しそうなら小児科に相談を。`);
+    if(daysWith.size < rangeDays*0.6) adv.push("出ない日が多めです。朝ごはんのあとにトイレに座る習慣づけ（5分程度）が効果的なことがあります。");
+    if(hard>=real.length*0.3 && hard) adv.push("かためが多い傾向 → 食物繊維・水分不足ぎみかも。野菜・海藻・きのこ・豆・いも、玄米や麦ごはん、こまめな水分を。");
+    if(soft>=real.length*0.3 && soft) adv.push("ゆるめが多い傾向 → 冷たい飲みもの・アイス・甘いお菓子の量、食べすぎ・早食いをチェック。温かい汁物でおなかを冷やさない工夫を。");
+    if(hard && soft) adv.push("便秘と下痢をくり返しています。ストレスや生活リズム（寝る時間・朝の時間の余裕）も関係することがあるので、メモ欄に様子を書いておくと原因が見つけやすくなります。");
+    if(dark>=real.length*0.3 && dark) adv.push("色が濃い日が多め → 肉・揚げものが多いかも。発酵食品（みそ・納豆・ヨーグルト等）や野菜を増やしてみて。");
+    if(painN>=2) adv.push("腹痛が何度かありました。痛みが出た日のメモ（前日の食事・出来事）を比べると共通点が見えるかもしれません。続くようなら受診時にこの記録を見せてください。");
+    if(real.length && goodN/real.length>=0.7) adv.push("よいウンチが7割以上！今の食生活・生活リズムが合っているようです。");
+    if(!adv.length) adv.push("大きな偏りはありません。このまま記録を続けて、変化があればチェックしましょう。");
+  }
+  $("advice").innerHTML=adv.map(a=>`<li>${a}</li>`).join("");
+}
+$("exportBtn").onclick=async()=>{
+  const lines=["日付\t時刻\tかたち\tいろ\tにおい\tおなか\tメモ"];
+  sortEntries(kidEntries()).forEach(e=>{
+    lines.push([e.date,e.time||"",e.shape==="nopoop"?"出なかった":(SHAPE_MAP[e.shape]||{}).n,(COLOR_MAP[e.color]||{}).n||"",(SMELL_MAP[e.smell]||{}).n||"",(PAIN_MAP[e.pain]||{}).n||"",e.memo||""].join("\t"));
+  });
+  const txt=`【${currentKid}のうんち記録】\n`+lines.join("\n");
+  $("expOut").textContent=txt; $("expOut").classList.remove("hide");
+  try{ await navigator.clipboard.writeText(txt); toast("コピーしました"); }catch(e){ toast("下の一覧を長押しでコピーしてください"); }
+};
+
+// ---------- タブ ----------
+function switchTab(t){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  ["rec","cal","sum","share"].forEach(x=>$("tab-"+x).classList.toggle("hide",x!==t));
+  if(t==="cal") renderCal(); if(t==="sum") renderSum(); if(t==="rec") renderToday();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+
+function renderAll(){ renderKids(); renderForm(); renderToday(); renderCal(); renderSum(); }
+
+// ---------- 起動 ----------
+$("fDate").value=todayStr(); $("fTime").value=nowTime();
+renderAll();
+setSaveBar("");
+
+// ---------- 共有コード ----------
+const CODE_PREFIX = "UNCHI1";
+function b64urlFromBytes(bytes){ let bin=""; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000)); return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function bytesFromB64url(s){ s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+async function pipe(bytes, stream){ const r = new Blob([bytes]).stream().pipeThrough(stream); return new Uint8Array(await new Response(r).arrayBuffer()); }
+async function makeCode(){
+  const payload = {v:1, children:state.children, entries:state.entries, deleted:state.deleted};
+  const raw = new TextEncoder().encode(JSON.stringify(payload));
+  if(typeof CompressionStream!=="undefined"){
+    try{ return CODE_PREFIX+"z."+b64urlFromBytes(await pipe(raw, new CompressionStream("deflate-raw"))); }catch(e){}
+  }
+  return CODE_PREFIX+"p."+b64urlFromBytes(raw);
+}
+async function readCode(code){
+  code = String(code||"").trim();
+  const m = code.match(/UNCHI1([zp])\.([A-Za-z0-9_-]+)/);
+  if(!m) throw new Error("format");
+  let bytes = bytesFromB64url(m[2]);
+  if(m[1]==="z"){
+    if(typeof DecompressionStream==="undefined") throw new Error("nodecomp");
+    bytes = await pipe(bytes, new DecompressionStream("deflate-raw"));
+  }
+  const o = JSON.parse(new TextDecoder().decode(bytes));
+  if(!o || !Array.isArray(o.entries)) throw new Error("format");
+  return o;
+}
+function mergeIn(o){
+  let added=0, updated=0, removed=0;
+  const del = Object.assign({}, state.deleted);
+  Object.entries(o.deleted||{}).forEach(([id,t])=>{ if(!(del[id]>=t)) del[id]=t; });
+  const map = new Map(state.entries.map(e=>[e.id,e]));
+  (o.entries||[]).forEach(e=>{
+    if(!e || typeof e.id!=="string" || typeof e.date!=="string") return;
+    const cur = map.get(e.id);
+    if(!cur){ map.set(e.id,e); added++; }
+    else if((e.at||0) > (cur.at||0)){ map.set(e.id,e); updated++; }
+  });
+  for(const [id,e] of map){ if(del[id] && del[id] >= (e.at||0)) map.delete(id); }
+  const before = new Set(state.entries.map(e=>e.id));
+  added = [...map.keys()].filter(id=>!before.has(id)).length;
+  removed = [...before].filter(id=>!map.has(id)).length;
+  const kids = state.children.slice();
+  (o.children||[]).forEach(c=>{ if(typeof c==="string" && c && !kids.includes(c)) kids.push(c); });
+  // 未使用の初期名「こども」は取り込み時に整理
+  const ents=[...map.values()];
+  const cleanKids = kids.filter(c=> c!=="こども" || ents.some(e=>e.child===c) || kids.length===1);
+  state.children = cleanKids.length?cleanKids:["こども"];
+  state.entries = ents; state.deleted = del;
+  if(!state.children.includes(currentKid)) currentKid=state.children[0];
+  save(); renderAll();
+  return {added, updated, removed};
+}
+function siteURL(){ return location.href.split("#")[0]; }
+
+$("meName").value = state.me||"";
+$("meName").onchange=()=>{ state.me=$("meName").value.trim().slice(0,10); save(); toast("保存しました"); };
+
+$("makeCode").onclick=async()=>{
+  const code = await makeCode();
+  $("codeOut").value = code; $("codeBox").classList.remove("hide");
+  $("codeInfo").textContent = `${state.entries.length}件の記録・${code.length.toLocaleString()}文字`;
+};
+$("copyCode").onclick=async()=>{
+  const v=$("codeOut").value;
+  try{ await navigator.clipboard.writeText(v); toast("コピーしました"); }
+  catch(e){ $("codeOut").select(); toast("長押しでコピーしてください"); }
+};
+$("shareLink").onclick=async()=>{
+  const link = siteURL()+"#import="+$("codeOut").value;
+  const text = "うんち日記の記録です。リンクを開くと取り込めます。";
+  if(navigator.share){ try{ await navigator.share({title:"うんち日記", text, url:link}); return; }catch(e){ if(e && e.name==="AbortError") return; } }
+  try{ await navigator.clipboard.writeText(link); toast("リンクをコピーしました"); }catch(e){ toast("コードをコピーして送ってください"); }
+};
+async function doImport(code){
+  try{
+    const o = await readCode(code);
+    const r = mergeIn(o);
+    $("importMsg").textContent = `取り込みました：新規${r.added}件・更新${r.updated}件・削除${r.removed}件`;
+    toast("取り込みました");
+    return true;
+  }catch(e){
+    $("importMsg").textContent = e.message==="nodecomp" ? "このブラウザでは読み込めません。ブラウザを最新版に更新してください。" : "コードを読み取れませんでした。最後まで正しくコピーされているか確認してください。";
+    return false;
+  }
+}
+$("importBtn").onclick=()=>{ const v=$("codeIn").value; if(v.trim()) doImport(v).then(ok=>{ if(ok) $("codeIn").value=""; }); };
+
+// バックアップ（ファイル）
+$("backupBtn").onclick=async()=>{
+  const code = await makeCode();
+  const blob = new Blob([code], {type:"text/plain"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`unchi-diary-${todayStr()}.txt`; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+};
+$("restoreFile").onchange=async(ev)=>{
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  const t=await f.text(); await doImport(t); ev.target.value="";
+};
+
+// リンクからの取り込み
+function checkHashImport(){
+  const h = location.hash;
+  if(h.startsWith("#import=")){
+    const code = decodeURIComponent(h.slice(8));
+    history.replaceState(null,"",siteURL());
+    switchTab("share");
+    $("codeIn").value = code;
+    $("importMsg").textContent = "受け取った記録があります。「取り込む」を押すと、この端末の記録とまとめられます。";
+  }
+}
+window.addEventListener("hashchange", checkHashImport);
+
+// 永続保存のお願い（ホーム画面追加時に効果的）
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+// オフライン対応
+if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+
+checkHashImport();
+})();
+</script>
+</body>
+</html>
