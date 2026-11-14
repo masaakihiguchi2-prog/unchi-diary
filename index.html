@@ -7,6 +7,7 @@
 <meta name="description" content="子どものうんちを形と色で毎日記録。便秘・下痢の傾向がひと目でわかる無料アプリ。">
 <meta name="theme-color" content="#fbf6ee">
 <link rel="manifest" href="manifest.json">
+<script src="config.js"></script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -198,14 +199,36 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
   </section>
   <!-- 共有 -->
   <section id="tab-share" class="hide">
+    <div class="card hide" id="famCard">
+      <h2>家族で自動共有</h2>
+      <div id="famOff">
+        <p class="note">家族のスマホどうしで、記録が自動で同じになります。記録はインターネット上（Google Firebase）に保存され、<b>家族コードを知っている人だけ</b>が見たり書いたりできます。</p>
+        <button class="btn" id="famCreate">家族を作る（最初の1人）</button>
+        <div class="lbl" style="margin-top:18px">家族から届いた「家族コード」で参加</div>
+        <input type="text" id="famCodeIn" placeholder="家族コードを貼り付け" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="btn sub" id="famJoin">この家族に参加する</button>
+      </div>
+      <div id="famOn" class="hide">
+        <p class="note"><b style="color:var(--good)">✓ 家族で共有中です。</b>入力した記録は家族のスマホにもすぐ反映されます。</p>
+        <div class="lbl">家族コード（家族以外には教えないでください）</div>
+        <input type="text" id="famCodeOut" readonly style="font-size:14px">
+        <div class="row" style="margin-top:8px">
+          <button class="btn sub" id="famCopy" style="margin-top:0">コードをコピー</button>
+          <button class="btn sub" id="famShare" style="margin-top:0">家族に送る</button>
+        </div>
+        <p class="note">家族はアプリの「共有」タブで、このコードを貼り付けて「参加する」を押すだけです。</p>
+        <button class="btn sub" id="famLeave">この端末での共有をやめる</button>
+      </div>
+      <p class="note" id="famMsg"></p>
+    </div>
     <div class="card">
-      <h2>記録はこの端末の中だけに保存されます</h2>
-      <p class="note">サーバーには送信されません。ブラウザのデータを消去すると記録も消えるので、<b>ホーム画面に追加</b>して使い、ときどき下の「バックアップ」をしてください。</p>
+      <h2 id="storeTitle">記録はこの端末の中だけに保存されます</h2>
+      <p class="note" id="storeNote">サーバーには送信されません。ブラウザのデータを消去すると記録も消えるので、<b>ホーム画面に追加</b>して使い、ときどき下の「バックアップ」をしてください。</p>
       <div class="lbl">入力する人の名前（記録に表示されます）</div>
       <input type="text" id="meName" placeholder="例：パパ、ママ" maxlength="10">
     </div>
-    <div class="card">
-      <h2>家族と記録をまとめる</h2>
+    <div class="card" id="codeCard">
+      <h2>家族と記録をまとめる（手動）</h2>
       <p class="note">① 片方の端末で「共有コードを作る」→ LINEなどで送る<br>② もう片方で受け取ったリンクを開くか、コードを貼り付けて「取り込む」<br>同じ記録は重ならず、両方の記録が1つにまとまります。お互いに送り合うと2台とも同じ内容になります。</p>
       <button class="btn" id="makeCode">共有コードを作る</button>
       <div id="codeBox" class="hide">
@@ -318,13 +341,30 @@ function save(){
   if(!lsSet(LS_KEY, JSON.stringify(state))){ setSaveBar("保存できませんでした（プライベートブラウズでは保存されません）"); toast("保存できませんでした"); return false; }
   return true;
 }
-async function writeEntry(e){ state.entries.push(e); return save(); }
+let cloud = null; // {fs, db, famRef, fid}
+function cloudErr(err){ console.warn(err); setSaveBar("ネットに保存できませんでした。電波の良い所で開き直してください"); }
+async function writeEntry(e){
+  if(cloud){
+    const o=Object.assign({},e); delete o.id;
+    cloud.fs.setDoc(cloud.fs.doc(cloud.famRef,"entries",e.id), o).catch(cloudErr);
+    return true; // 画面への反映は同期（onSnapshot）で行う
+  }
+  state.entries.push(e); return save();
+}
 async function deleteEntry(id){
+  if(cloud){
+    cloud.fs.deleteDoc(cloud.fs.doc(cloud.famRef,"entries",id)).catch(cloudErr);
+    state.entries = state.entries.filter(x=>x.id!==id);
+    return true;
+  }
   state.entries = state.entries.filter(x=>x.id!==id);
   state.deleted[id] = Date.now();
   return save();
 }
-async function saveSettings(){ save(); }
+async function saveSettings(){
+  if(cloud){ cloud.fs.setDoc(cloud.famRef,{children:state.children},{merge:true}).catch(cloudErr); return; }
+  save();
+}
 function newId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function setSaveBar(t){ document.getElementById("savebar").textContent = t; }
 
@@ -673,6 +713,144 @@ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persis
 // オフライン対応
 if("serviceWorker" in navigator && location.protocol==="https:"){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 
+// ---------- 家族で自動共有（Firebase） ----------
+const FB_VER = "10.12.2";
+const FAM_KEY = LS_KEY+":family";
+const cfg = window.UNCHI_FIREBASE_CONFIG;
+let fbPromise = null;
+function loadFirebase(){
+  if(fbPromise) return fbPromise;
+  fbPromise = (async()=>{
+    const base = `https://www.gstatic.com/firebasejs/${FB_VER}/`;
+    const [appM, authM, fs] = await Promise.all([import(base+"firebase-app.js"), import(base+"firebase-auth.js"), import(base+"firebase-firestore.js")]);
+    const app = appM.initializeApp(cfg);
+    let db;
+    try{ db = fs.initializeFirestore(app, {localCache: fs.persistentLocalCache({tabManager: fs.persistentMultipleTabManager()})}); }
+    catch(e){ db = fs.getFirestore(app); }
+    const auth = authM.getAuth(app);
+    if(!auth.currentUser) await authM.signInAnonymously(auth);
+    return {fs, db};
+  })();
+  fbPromise.catch(()=>{ fbPromise=null; });
+  return fbPromise;
+}
+function genFid(){
+  const abc="abcdefghijkmnpqrstuvwxyz23456789"; const b=new Uint8Array(24); crypto.getRandomValues(b);
+  return Array.from(b, x=>abc[x%abc.length]).join("");
+}
+function cleanFid(v){ const m=String(v||"").toLowerCase().match(/[a-z0-9]{20,40}/); return m?m[0]:""; }
+let unsubs=[];
+async function connectFamily(fid, mode){ // mode: "create" | "join" | "resume"
+  $("famMsg").textContent = mode==="resume" ? "" : "接続中…";
+  setSaveBar("家族のデータに接続中…");
+  const {fs, db} = await loadFirebase();
+  const famRef = fs.doc(db, "families", fid);
+  if(mode==="create"){
+    await fs.setDoc(famRef, {children: state.children, createdAt: fs.serverTimestamp()});
+  } else if(mode==="join"){
+    const snap = await fs.getDoc(famRef);
+    if(!snap.exists()) throw new Error("notfound");
+  }
+  const localEntries = (mode==="resume") ? [] : state.entries.slice();
+  const localKids = state.children.slice();
+  cloud = {fs, db, famRef, fid};
+  lsSet(FAM_KEY, fid);
+  unsubs.forEach(u=>u()); unsubs=[];
+  let first = true;
+  unsubs.push(fs.onSnapshot(fs.collection(famRef,"entries"), snap=>{
+    state.entries = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    if(first && !snap.metadata.fromCache){
+      first=false;
+      // この端末にだけあった記録を家族データへ移す
+      const have = new Set(state.entries.map(e=>e.id));
+      localEntries.filter(e=>!have.has(e.id)).forEach(e=>{ const o=Object.assign({},e); delete o.id; fs.setDoc(fs.doc(famRef,"entries",e.id), o).catch(cloudErr); });
+    }
+    setSaveBar(snap.metadata.fromCache ? "オフライン：つながると自動で同期します" : "");
+    renderAll();
+  }, err=>{ cloudErr(err); }));
+  let firstFam = true;
+  unsubs.push(fs.onSnapshot(famRef, snap=>{
+    if(!snap.exists()) return;
+    const d = snap.data()||{};
+    let kids = Array.isArray(d.children) ? d.children.filter(c=>typeof c==="string"&&c) : [];
+    if(firstFam && mode!=="resume"){
+      firstFam=false;
+      const merged = kids.slice();
+      localKids.forEach(c=>{ if(!merged.includes(c) && (c!=="こども" || localEntries.some(e=>e.child===c))) merged.push(c); });
+      if(!merged.length) merged.push("こども");
+      if(merged.join("\n")!==kids.join("\n")) fs.setDoc(famRef,{children:merged},{merge:true}).catch(cloudErr);
+      kids = merged;
+    }
+    if(kids.length){ state.children = kids; if(!state.children.includes(currentKid)) currentKid=state.children[0]; }
+    renderAll();
+  }, err=>{ cloudErr(err); }));
+  renderFamily();
+  $("famMsg").textContent = mode==="create" ? "家族を作りました。下の家族コードを家族に送ってください。" : mode==="join" ? "家族に参加しました。" : "";
+}
+function renderFamily(){
+  if(!cfg || !cfg.apiKey){ $("famCard").classList.add("hide"); return; }
+  $("famCard").classList.remove("hide");
+  const on = !!cloud;
+  $("famOff").classList.toggle("hide", on);
+  $("famOn").classList.toggle("hide", !on);
+  $("codeCard").classList.toggle("hide", on);
+  if(on){
+    $("famCodeOut").value = cloud.fid;
+    $("storeTitle").textContent = "記録は家族で共有されています";
+    $("storeNote").innerHTML = "記録はインターネット上に保存され、家族のスマホと自動で同じになります。電波がないときに入力した分も、つながったときに送られます。";
+  } else {
+    $("storeTitle").textContent = "記録はこの端末の中だけに保存されます";
+    $("storeNote").innerHTML = "サーバーには送信されません。ブラウザのデータを消去すると記録も消えるので、<b>ホーム画面に追加</b>して使い、ときどき下の「バックアップ」をしてください。";
+  }
+}
+function famFail(e){
+  console.warn(e);
+  cloud=null; renderFamily();
+  $("famMsg").textContent = (e && e.message==="notfound") ? "その家族コードは見つかりませんでした。コピー漏れがないか確認してください。" : "接続できませんでした。電波の良い所でもう一度お試しください。";
+  setSaveBar("");
+}
+let famBusy=false;
+$("famCreate").onclick=async()=>{
+  if(famBusy) return; famBusy=true;
+  try{ await connectFamily(genFid(), "create"); }catch(e){ famFail(e); }
+  famBusy=false;
+};
+$("famJoin").onclick=async()=>{
+  const fid = cleanFid($("famCodeIn").value);
+  if(!fid){ $("famMsg").textContent="家族コードを貼り付けてください"; return; }
+  if(famBusy) return; famBusy=true;
+  try{ await connectFamily(fid, "join"); $("famCodeIn").value=""; }catch(e){ famFail(e); }
+  famBusy=false;
+};
+$("famCopy").onclick=async()=>{
+  try{ await navigator.clipboard.writeText($("famCodeOut").value); toast("コピーしました"); }
+  catch(e){ $("famCodeOut").select(); toast("長押しでコピーしてください"); }
+};
+$("famShare").onclick=async()=>{
+  const text = `うんち日記の家族コードです。\nアプリの「共有」タブで貼り付けて「この家族に参加する」を押してください。\n\n${cloud?cloud.fid:""}\n\nアプリ：${siteURL()}`;
+  if(navigator.share){ try{ await navigator.share({title:"うんち日記", text}); return; }catch(e){ if(e&&e.name==="AbortError") return; } }
+  try{ await navigator.clipboard.writeText(text); toast("コピーしました。LINEなどに貼り付けてください"); }catch(e){ toast("コードをコピーして送ってください"); }
+};
+const leaveState={armed:false};
+$("famLeave").onclick=()=>{
+  if(!leaveState.armed){ leaveState.armed=true; $("famLeave").textContent="もう一度押すと共有をやめます（記録は家族側に残ります）"; setTimeout(()=>{leaveState.armed=false; $("famLeave").textContent="この端末での共有をやめる";},4000); return; }
+  unsubs.forEach(u=>u()); unsubs=[];
+  // 共有中の記録をこの端末に残す
+  save();
+  cloud=null; try{ localStorage.removeItem(FAM_KEY); }catch(e){}
+  renderFamily(); renderAll(); toast("この端末での共有をやめました");
+};
+function checkFamilyHash(){
+  const m = location.hash.match(/^#family=([a-z0-9]{20,40})/i);
+  if(m){ history.replaceState(null,"",siteURL()); switchTab("share"); if(!cloud){ $("famCodeIn").value=m[1].toLowerCase(); $("famMsg").textContent="「この家族に参加する」を押すと参加できます。"; } }
+}
+window.addEventListener("hashchange", checkFamilyHash);
+renderFamily();
+if(cfg && cfg.apiKey){
+  const fid = cleanFid(lsGet(FAM_KEY));
+  if(fid) connectFamily(fid, "resume").catch(e=>{ console.warn(e); setSaveBar("オフラインです。つながると自動で同期します"); });
+}
+checkFamilyHash();
 checkHashImport();
 })();
 </script>

@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 家族データ：家族コード（推測できないランダム文字列）を知っている人だけが読み書きできる
+    match /families/{fid} {
+      allow get: if request.auth != null && fid.size() >= 20;
+      allow create, update: if request.auth != null && fid.size() >= 20
+        && request.resource.data.keys().hasOnly(['children', 'createdAt'])
+        && request.resource.data.children is list
+        && request.resource.data.children.size() <= 20;
+      allow list, delete: if false;
+
+      match /entries/{eid} {
+        allow read, delete: if request.auth != null && fid.size() >= 20;
+        allow create, update: if request.auth != null && fid.size() >= 20
+          && request.resource.data.keys().hasOnly(['child','date','time','shape','color','smell','pain','memo','by','at'])
+          && request.resource.data.date is string && request.resource.data.date.size() == 10
+          && (!('memo' in request.resource.data) || request.resource.data.memo.size() <= 500);
+      }
+    }
+  }
+}
