@@ -17,6 +17,15 @@ service cloud.firestore {
           && request.resource.data.date is string && request.resource.data.date.size() == 10
           && (!('memo' in request.resource.data) || request.resource.data.memo.size() <= 500);
       }
+
+      match /meals/{mid} {
+        allow read, delete: if request.auth != null && fid.size() >= 20;
+        allow create, update: if request.auth != null && fid.size() >= 20
+          && request.resource.data.keys().hasOnly(['child','date','meal','thumb','foods','scores','comment','memo','src','by','at'])
+          && request.resource.data.date is string && request.resource.data.date.size() == 10
+          && (!('thumb' in request.resource.data) || request.resource.data.thumb.size() <= 120000)
+          && (!('memo' in request.resource.data) || request.resource.data.memo.size() <= 500);
+      }
     }
   }
 }
