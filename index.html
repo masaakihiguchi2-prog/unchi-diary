@@ -96,6 +96,29 @@ textarea{min-height:60px;resize:vertical}
 .entry .mini svg{width:64px;height:64px}
 details summary{cursor:pointer;color:var(--sub);font-size:14px;padding:10px 0}
 .day .mk{font-size:9px;line-height:1;margin-top:auto}
+.streak{display:flex;gap:10px;align-items:center;font-size:15px;line-height:1.5}
+.streak .fire{font-size:30px}
+.sub{color:var(--sub);font-size:12.5px;font-weight:400}
+.prog{height:8px;background:#f1ebe2;border-radius:99px;overflow:hidden;margin-top:10px}
+.prog div{height:100%;background:linear-gradient(90deg,#f2c14e,#E9A54B);border-radius:99px}
+.famw{font-size:13.5px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.stamps{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0}
+.stamp svg{width:100%;height:auto;display:block}
+.modal{position:fixed;inset:0;background:rgba(47,38,32,.45);z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;animation:fi .2s}
+.mbox{background:#fff;border-radius:20px;padding:22px 20px 18px;max-width:380px;width:100%;text-align:center;max-height:85vh;overflow:auto;animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
+.mbox h2{margin:6px 0 8px;font-size:20px}
+.mbox p{font-size:14.5px;line-height:1.7;margin:6px 0}
+.mbox .badge svg{width:96px;height:96px}
+.mbox .reward{background:#fff4e2;border-radius:12px;padding:10px}
+.mbox .wk{text-align:left;background:#faf6f0;border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.8}
+.mbox .wk h3{margin:0 0 4px;font-size:15px}
+.mbox .famw{text-align:left}
+@keyframes fi{from{opacity:0}}
+@keyframes pop{from{transform:scale(.8);opacity:0}}
+.confetti{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:40}
+.badges{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.bd span{display:block;font-size:11px;color:var(--sub)}
+.bd.on span{color:var(--warn);font-weight:700}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:#faf6f0;border-radius:12px;padding:10px 6px;text-align:center}
 .stat b{display:block;font-size:22px}
@@ -138,6 +161,7 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
 <main>
   <!-- 記録 -->
   <section id="tab-rec">
+    <div class="card" id="motiCard"></div>
     <div class="card">
       <div class="lbl">日時</div>
       <div class="row"><input type="date" id="fDate"><input type="time" id="fTime"></div>
@@ -166,6 +190,13 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
       <h2 id="todayTitle">今日の記録</h2>
       <div id="todayList"></div>
       <button class="btn sub" id="noPoop">今日は出なかった（記録）</button>
+    </div>
+    <div class="card">
+      <h2 id="stampTitle">スタンプカード</h2>
+      <div class="stamps" id="stampGrid"></div>
+      <p class="note" id="stampInfo"></p>
+      <div class="lbl">10こたまったら、ごほうびは？</div>
+      <input type="text" id="rewardIn" placeholder="例：公園でソフトクリーム" maxlength="30">
     </div>
   </section>
 
@@ -222,6 +253,12 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
       <div class="bar" id="shapeBar"></div><div class="barl" id="shapeLeg"></div>
       <div class="lbl">いろの内訳</div>
       <div class="bar" id="colorBar"></div><div class="barl" id="colorLeg"></div>
+    </div>
+    <div class="card">
+      <h2>がんばりバッジ</h2>
+      <div class="badges" id="badgeGrid"></div>
+      <p class="note" id="badgeInfo" style="text-align:center"></p>
+      <button class="btn sub" id="weeklyBtn">先週のまとめを見る</button>
     </div>
     <div class="card hide" id="foodCard">
       <h2>食事のバランス（1日平均）</h2>
@@ -510,6 +547,7 @@ $("save").onclick=async()=>{
   if(ok){
     form.shape=null; form.color=null; form.smell="normal"; form.pain="none"; $("fMemo").value="";
     toast("記録しました"); setSaveBar("");
+    celebrateAfterSave(e.date, isGood(e));
   }
   renderAll();
 };
@@ -518,7 +556,7 @@ $("noPoop").onclick=async()=>{
   const has = state.entries.some(x=>x.child===currentKid && x.date===d);
   if(has){ toast("この日はすでに記録があります"); return; }
   const ok = await writeEntry({id:newId(), child:currentKid, date:d, time:"", shape:"nopoop", color:"", smell:"", pain:form.pain, memo:$("fMemo").value.trim(), by:state.me||"", at:Date.now()});
-  if(ok){ $("fMemo").value=""; toast("「出なかった」を記録しました"); }
+  if(ok){ $("fMemo").value=""; toast("「出なかった」を記録しました"); celebrateAfterSave(d, false); }
   renderAll();
 };
 
@@ -841,7 +879,7 @@ $("mSave").onclick = async()=>{
     memo:$("mMemo").value.trim().slice(0,200), src:meal.src||"photo", by:state.me||"", at:Date.now() };
   const ok = await writeMeal(m);
   mealBusy=false;
-  if(ok){ toast("食事を記録しました"); resetMeal(); }
+  if(ok){ toast("食事を記録しました"); resetMeal(); celebrateAfterSave(m.date, false); }
   renderAll();
 };
 function mealHTML(m){
@@ -901,6 +939,196 @@ function mealInsights(sStr,eStr){
   return {avg, tips};
 }
 
+// ---------- がんばり（連続記録・スタンプ・週まとめ） ----------
+const FAM_LS = LS_KEY+":family";
+let cloudReady = false;
+const MILESTONES = [3,7,14,21,30,40,50,60,70,80,90,100,150,200,250,300,365];
+function isMilestone(n){ return MILESTONES.includes(n) || (n>365 && n%100===0); }
+function nextMilestone(n){ const m=MILESTONES.find(x=>x>n); return m || (Math.floor(n/100)+1)*100; }
+function badgeName(n){
+  return ({3:"はじめの一歩",7:"1週間",14:"2週間",21:"3週間",30:"1か月",60:"2か月",90:"3か月",100:"100日",365:"1年"})[n] || `${n}日`;
+}
+function badgeMsg(n){
+  if(n===3) return "3日続きました！いいスタートです。この調子で記録を続けると、おなかのクセが見えてきます。";
+  if(n===7) return "1週間続きました！1週間分あると「ふりかえり」で傾向が見え始めます。";
+  if(n===14) return "2週間続きました！食事とうんちの関係も、少しずつわかってきます。";
+  if(n===21) return "3週間！もうすっかり習慣になってきましたね。";
+  if(n===30) return "1か月達成！ここまで続けられる家族はなかなかいません。おなかの変化をふりかえってみましょう。";
+  if(n===100) return "100日達成！本当にすごい！お子さんの体のこと、家族でいちばんよく知っているのはあなたたちです。";
+  if(n===365) return "1年間、毎日の記録おつかれさまでした！最高の健康日記です。";
+  return `${n}日連続！毎日の積み重ねが、お子さんの体質改善の大きな手がかりになっています。`;
+}
+function recordedDays(kid){
+  const s=new Set();
+  state.entries.forEach(e=>{ if(e.child===kid) s.add(e.date); });
+  state.meals.forEach(m=>{ if(m.child===kid) s.add(m.date); });
+  return s;
+}
+function streakInfo(kid, extraDate){
+  const days=recordedDays(kid); if(extraDate) days.add(extraDate);
+  const t=todayStr(); const d=new Date(); const todayDone=days.has(t);
+  if(!todayDone) d.setDate(d.getDate()-1);
+  let cur=0; while(days.has(ymd(d))){ cur++; d.setDate(d.getDate()-1); }
+  // 最長記録
+  const sorted=[...days].sort(); let best=0, run=0, prev=null;
+  sorted.forEach(ds=>{
+    if(prev){ const [y,m,dd]=prev.split("-").map(Number); run = (ymd(new Date(y,m-1,dd+1))===ds) ? run+1 : 1; } else run=1;
+    best=Math.max(best,run); prev=ds;
+  });
+  return {cur, todayDone, best, total:days.size};
+}
+function goodCount(kid){ return state.entries.filter(e=>e.child===kid && e.shape!=="nopoop" && isGood(e)).length; }
+function rewardKey(kid){ return LS_KEY+":reward:"+kid; }
+function weekStart(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+
+// 紙吹雪
+function confetti(){
+  try{ if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
+  const c=document.createElement("canvas"); c.className="confetti"; document.body.appendChild(c);
+  const W=c.width=innerWidth*devicePixelRatio, H=c.height=innerHeight*devicePixelRatio; const x=c.getContext("2d");
+  const cols=["#E9A54B","#d9573b","#3c8d5a","#79b58c","#f2c14e","#5b8def","#e66fa8"];
+  const P=Array.from({length:160},()=>({x:Math.random()*W, y:-Math.random()*H*0.6, vx:(Math.random()-.5)*4*devicePixelRatio, vy:(2+Math.random()*4)*devicePixelRatio, r:(4+Math.random()*5)*devicePixelRatio, a:Math.random()*6, va:(Math.random()-.5)*.3, c:cols[Math.floor(Math.random()*cols.length)]}));
+  const t0=performance.now();
+  (function f(t){
+    x.clearRect(0,0,W,H);
+    P.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.05*devicePixelRatio; p.a+=p.va; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillStyle=p.c; x.fillRect(-p.r/2,-p.r/4,p.r,p.r/2); x.restore(); });
+    if(t-t0<3500) requestAnimationFrame(f); else c.remove();
+  })(t0);
+}
+function showModal(html, opts){
+  const m=document.createElement("div"); m.className="modal";
+  m.innerHTML=`<div class="mbox">${html}<button class="btn" data-close>${(opts&&opts.btn)||"やったね！"}</button></div>`;
+  m.addEventListener("click",e=>{ if(e.target===m || e.target.hasAttribute("data-close")) m.remove(); });
+  document.body.appendChild(m);
+}
+function badgeSVG(n, earned){
+  const col = earned ? "#E9A54B" : "#e8ddcf";
+  return `<svg viewBox="0 0 80 80" width="64" height="64"><circle cx="40" cy="40" r="34" fill="${earned?"#fff4e2":"#faf6f0"}" stroke="${col}" stroke-width="5"/>
+    <text x="40" y="${String(n).length>2?46:48}" text-anchor="middle" font-size="${String(n).length>2?20:24}" font-weight="700" fill="${earned?"#b4621b":"#c7b8aa"}">${n}</text>
+    <text x="40" y="62" text-anchor="middle" font-size="9" fill="${earned?"#b4621b":"#c7b8aa"}">日</text></svg>`;
+}
+// 記録後のお祝いチェック
+function celebrateAfterSave(date, wasGood){
+  const kid=currentKid;
+  const s=streakInfo(kid, date);
+  const queue=[];
+  if(date===todayStr() && isMilestone(s.cur)){
+    // 連続の開始日でキーを作り、同じ連続で二度出さない
+    const start=ymd(addDays(new Date(), -(s.cur-1)));
+    const key=`${LS_KEY}:cel:${kid}:${s.cur}:${start}`;
+    if(!lsGet(key)){ lsSet(key,"1");
+      queue.push(()=>{ confetti(); showModal(`<div class="badge">${badgeSVG(s.cur,true)}</div><h2>${esc(badgeName(s.cur))}バッジ獲得！</h2><p>${esc(kid)}の記録が<b>${s.cur}日連続</b>になりました。</p><p class="note">${esc(badgeMsg(s.cur))}</p>`); });
+    }
+  }
+  if(wasGood){
+    const n=goodCount(kid);
+    const inCard = ((n-1)%10)+1;
+    if(inCard===10){
+      const reward=lsGet(rewardKey(kid))||"";
+      queue.push(()=>{ confetti(); showModal(`<div class="badge" style="font-size:52px">🎉</div><h2>スタンプ10こ達成！</h2><p>${esc(kid)}、よいウンチがたくさん出たね！</p>${reward?`<p class="reward">ごほうび：<b>${esc(reward)}</b></p>`:'<p class="note">「スタンプカード」でごほうびを決めておくと、ここに表示されます。</p>'}`); });
+    } else {
+      queue.push(()=>toast(`スタンプゲット！あと${10-inCard}こ`));
+    }
+  }
+  // 順番に表示
+  const run=()=>{ const f=queue.shift(); if(!f) return; f(); if(queue.length){ const iv=setInterval(()=>{ if(!document.querySelector(".modal")){ clearInterval(iv); run(); } },400); } };
+  setTimeout(run, 350);
+}
+
+// 週の家族の記録数
+function familyWeekCount(){
+  const ws=ymd(weekStart(new Date())), t=todayStr();
+  const n = state.entries.filter(e=>e.date>=ws && e.date<=t).length + state.meals.filter(m=>m.date>=ws && m.date<=t).length;
+  const who=[...new Set(state.entries.concat(state.meals).filter(e=>e.date>=ws && e.date<=t && e.by).map(e=>e.by))];
+  return {n, who};
+}
+function stampSVG(on, i){
+  if(on) return `<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="27" fill="#fff4e2" stroke="#E9A54B" stroke-width="3"/><g transform="translate(6 12) scale(.8)"><path d="M7 31 Q30 31 49 8 Q55 4 54 11 Q44 35 16 37 Q4 37 7 31 Z" fill="#E9A54B" stroke="#3a2a20" stroke-width="2.2" stroke-linejoin="round"/></g></svg>`;
+  return `<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="#e3d6c5" stroke-width="2.5" stroke-dasharray="5 4"/><text x="30" y="36" text-anchor="middle" font-size="16" fill="#cdbfb0">${i}</text></svg>`;
+}
+function renderMoti(){
+  const kid=currentKid, s=streakInfo(kid), fw=familyWeekCount();
+  let head;
+  if(s.cur>0){
+    const nx=nextMilestone(s.cur);
+    head = `<div class="streak"><span class="fire">🔥</span><div><b>${s.cur}日連続</b>で記録中${s.todayDone?"":`<span class="sub">（今日の記録で${s.cur+1}日目）</span>`}<div class="sub">あと${nx-s.cur}日で「${esc(badgeName(nx))}」バッジ</div></div></div>
+      <div class="prog"><div style="width:${Math.min(100,(s.cur/nx)*100)}%"></div></div>`;
+  } else if(s.total>0){
+    head = `<div class="streak"><span class="fire">🌱</span><div><b>また今日から始めよう！</b><div class="sub">これまでの最長は${s.best}日連続。記録するとまたカウントが始まります。</div></div></div>`;
+  } else {
+    head = `<div class="streak"><span class="fire">🌱</span><div><b>今日から記録をはじめよう</b><div class="sub">3日続けると最初のバッジがもらえます。</div></div></div>`;
+  }
+  const fam = fw.n ? `<div class="famw">👨‍👩‍👧 今週は家族で<b>${fw.n}件</b>記録${fw.who.length>1?`（${fw.who.map(esc).join("・")}で協力中）`:""}</div>` : "";
+  $("motiCard").innerHTML = head + fam;
+
+  // スタンプカード
+  const n=goodCount(kid);
+  const card = n===0 ? 1 : Math.floor((n-1)/10)+1;
+  const inCard = n===0 ? 0 : ((n-1)%10)+1;
+  const reward = lsGet(rewardKey(kid))||"";
+  $("stampGrid").innerHTML = Array.from({length:10},(_,i)=>`<div class="stamp">${stampSVG(i<inCard, i+1)}</div>`).join("");
+  $("stampTitle").textContent = `${kid}のスタンプカード（${card}枚目）`;
+  $("stampInfo").innerHTML = inCard===10 ? `<b>10こ達成！</b>${reward?`ごほうび：<b>${esc(reward)}</b>`:""}　次のよいウンチから新しいカードです。`
+    : `よいウンチ（バナナ・半ねり／黄色〜黄土色）でスタンプ1こ。あと<b>${10-inCard}こ</b>${reward?`で「${esc(reward)}」`:""}！`;
+  if(document.activeElement!==$("rewardIn")) $("rewardIn").value = reward;
+}
+$("rewardIn").onchange=()=>{ lsSet(rewardKey(currentKid), $("rewardIn").value.trim().slice(0,30)); toast("ごほうびを保存しました"); renderMoti(); };
+
+function renderBadges(){
+  const s=streakInfo(currentKid);
+  const list=[3,7,14,21,30,40,50,60,70,80,90,100];
+  const extra = s.best>100 ? MILESTONES.filter(m=>m>100 && m<=s.best) : [];
+  $("badgeGrid").innerHTML = list.concat(extra).map(n=>`<div class="bd ${s.best>=n?"on":""}">${badgeSVG(n, s.best>=n)}<span>${esc(badgeName(n))}</span></div>`).join("");
+  $("badgeInfo").textContent = `いまの連続：${s.cur}日　／　最長：${s.best}日　／　記録した日：合計${s.total}日`;
+}
+
+// 先週のまとめ
+function weekStats(kid, ws){
+  const a=ymd(ws), b=ymd(addDays(ws,6));
+  const es=state.entries.filter(e=>e.child===kid && e.date>=a && e.date<=b);
+  const real=es.filter(e=>e.shape!=="nopoop");
+  const ms=state.meals.filter(m=>m.child===kid && m.date>=a && m.date<=b);
+  const days=new Set(es.map(e=>e.date).concat(ms.map(m=>m.date)));
+  const good=real.filter(isGood).length;
+  const mdays=[...new Set(ms.map(m=>m.date))];
+  let food=null;
+  if(mdays.length){ food=emptyScores(); mdays.forEach(d=>{ const s=dayScores(d)||emptyScores(); NUTS.forEach(n=>food[n.k]+=s[n.k]/mdays.length); }); }
+  return {days:days.size, n:real.length, rate: real.length? Math.round(good/real.length*100) : null, poopDays:new Set(real.map(e=>e.date)).size, pain:es.filter(e=>e.pain&&e.pain!=="none").length, food, records: es.length+ms.length};
+}
+function weeklyHTML(){
+  const thisWs=weekStart(new Date()), lw=addDays(thisWs,-7), pw=addDays(thisWs,-14);
+  const arrow=(a,b,unit,higherBetter)=>{ if(a==null||b==null) return ""; const d=a-b; if(Math.abs(d)<(unit==="%"?5:0.3)) return `<span class="sub">→ 先週並み</span>`; const up=d>0; const good = higherBetter?up:!up; return `<span style="color:${good?"var(--good)":"var(--warn)"}">${up?"▲":"▼"} ${Math.abs(Math.round(d*10)/10)}${unit}</span>`; };
+  let html=`<h2>先週のまとめ</h2><p class="note">${fmtDate(ymd(lw))}〜${fmtDate(ymd(addDays(lw,6)))}</p>`;
+  let famTotal=0, any=false;
+  state.children.forEach(kid=>{
+    const a=weekStats(kid,lw), b=weekStats(kid,pw); famTotal+=a.records;
+    if(!a.records) return; any=true;
+    html+=`<div class="wk"><h3>${esc(kid)}</h3>
+      <div>記録した日：<b>${a.days}/7日</b></div>
+      <div>うんちが出た日：<b>${a.poopDays}日</b>　${arrow(a.poopDays,b.records?b.poopDays:null,"日",true)}</div>
+      ${a.rate!=null?`<div>よいウンチ率：<b>${a.rate}%</b>　${arrow(a.rate,b.rate,"%",true)}</div>`:""}
+      ${a.pain?`<div>おなかが痛かった：<b>${a.pain}回</b></div>`:""}
+      ${a.food?`<div>食事（1日平均）：食物繊維 <b>${Math.round(a.food.fiber*10)/10}</b> ${arrow(a.food.fiber,b.food&&b.food.fiber,"",true)}　水分 <b>${Math.round(a.food.water*10)/10}</b> ${arrow(a.food.water,b.food&&b.food.water,"",true)}　発酵食品 <b>${Math.round(a.food.ferment*10)/10}</b> ${arrow(a.food.ferment,b.food&&b.food.ferment,"",true)}</div>`:""}
+    </div>`;
+  });
+  if(!any) return null;
+  html+=`<p class="famw">👨‍👩‍👧 先週は家族で<b>${famTotal}件</b>記録しました。いつもおつかれさまです！</p>`;
+  return html;
+}
+let weeklyChecked=false;
+function maybeWeekly(){
+  if(weeklyChecked) return;
+  if(lsGet(FAM_LS) && !cloudReady) return; // 家族データの読み込み待ち
+  weeklyChecked=true;
+  const key=LS_KEY+":weekShown", lw=ymd(addDays(weekStart(new Date()),-7));
+  if(lsGet(key)===lw) return;
+  const html=weeklyHTML(); if(!html) return;
+  lsSet(key,lw);
+  setTimeout(()=>showModal(html,{btn:"今週もがんばろう"}), 600);
+}
+$("weeklyBtn").onclick=()=>{ const h=weeklyHTML(); if(h) showModal(h,{btn:"閉じる"}); else toast("先週の記録がありません"); };
+
 // ---------- タブ ----------
 function switchTab(t){
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
@@ -910,7 +1138,7 @@ function switchTab(t){
 }
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
 
-function renderAll(){ renderKids(); renderForm(); renderToday(); renderMeal(); renderCal(); renderSum(); }
+function renderAll(){ renderKids(); renderForm(); renderToday(); renderMeal(); renderCal(); renderSum(); renderMoti(); renderBadges(); maybeWeekly(); }
 
 // ---------- 起動 ----------
 $("fDate").value=todayStr(); $("fTime").value=nowTime(); $("mDate").value=todayStr();
@@ -1090,7 +1318,7 @@ async function connectFamily(fid, mode){ // mode: "create" | "join" | "resume"
   unsubs.push(fs.onSnapshot(fs.collection(famRef,"entries"), snap=>{
     state.entries = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
     if(first && !snap.metadata.fromCache){
-      first=false;
+      first=false; cloudReady=true;
       // この端末にだけあった記録を家族データへ移す
       const have = new Set(state.entries.map(e=>e.id));
       localEntries.filter(e=>!have.has(e.id)).forEach(e=>{ const o=Object.assign({},e); delete o.id; fs.setDoc(fs.doc(famRef,"entries",e.id), o).catch(cloudErr); });
