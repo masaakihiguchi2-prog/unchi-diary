@@ -5,9 +5,10 @@ service cloud.firestore {
     match /families/{fid} {
       allow get: if request.auth != null && fid.size() >= 20;
       allow create, update: if request.auth != null && fid.size() >= 20
-        && request.resource.data.keys().hasOnly(['children', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['children', 'createdAt', 'rewards'])
         && request.resource.data.children is list
-        && request.resource.data.children.size() <= 20;
+        && request.resource.data.children.size() <= 20
+        && (!('rewards' in request.resource.data) || (request.resource.data.rewards is map && request.resource.data.rewards.size() <= 20));
       allow list, delete: if false;
 
       match /entries/{eid} {

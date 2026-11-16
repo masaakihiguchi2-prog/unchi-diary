@@ -196,7 +196,7 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
       <div class="stamps" id="stampGrid"></div>
       <p class="note" id="stampInfo"></p>
       <div class="lbl">10こたまったら、ごほうびは？</div>
-      <input type="text" id="rewardIn" placeholder="例：公園でソフトクリーム" maxlength="30">
+      <input type="text" id="rewardIn" placeholder="例：好きな本を1冊買う" maxlength="30">
     </div>
   </section>
 
@@ -407,13 +407,14 @@ function shapeSVG(k, fill){
 const LS_KEY = "unchi-diary-v1";
 function lsGet(k){ try{ return localStorage.getItem(k);}catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
-let state = {children:["こども"], entries:[], meals:[], deleted:{}, me:""};
+let state = {children:["こども"], entries:[], meals:[], rewards:{}, deleted:{}, me:""};
 (function load(){
   const raw = lsGet(LS_KEY);
   if(raw){ try{ const o=JSON.parse(raw); if(o && typeof o==="object") state=Object.assign(state,o); }catch(e){} }
   if(!Array.isArray(state.children) || !state.children.length) state.children=["こども"];
   if(!Array.isArray(state.entries)) state.entries=[];
   if(!Array.isArray(state.meals)) state.meals=[];
+  if(!state.rewards || typeof state.rewards!=="object") state.rewards={};
   if(!state.deleted || typeof state.deleted!=="object") state.deleted={};
 })();
 let currentKid = lsGet(LS_KEY+":kid") || state.children[0];
@@ -978,7 +979,16 @@ function streakInfo(kid, extraDate){
   return {cur, todayDone, best, total:days.size};
 }
 function goodCount(kid){ return state.entries.filter(e=>e.child===kid && e.shape!=="nopoop" && isGood(e)).length; }
-function rewardKey(kid){ return LS_KEY+":reward:"+kid; }
+function getReward(kid){
+  if(state.rewards && typeof state.rewards[kid]==="string") return state.rewards[kid];
+  return lsGet(LS_KEY+":reward:"+kid)||""; // 旧版（端末保存）の値
+}
+function setReward(kid, v){
+  state.rewards = Object.assign({}, state.rewards, {[kid]: v});
+  try{ localStorage.removeItem(LS_KEY+":reward:"+kid); }catch(e){}
+  if(cloud){ cloud.fs.setDoc(cloud.famRef, {rewards: state.rewards}, {merge:true}).catch(cloudErr); }
+  else save();
+}
 function weekStart(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 
@@ -1025,7 +1035,7 @@ function celebrateAfterSave(date, wasGood){
     const n=goodCount(kid);
     const inCard = ((n-1)%10)+1;
     if(inCard===10){
-      const reward=lsGet(rewardKey(kid))||"";
+      const reward=getReward(kid);
       queue.push(()=>{ confetti(); showModal(`<div class="badge" style="font-size:52px">🎉</div><h2>スタンプ10こ達成！</h2><p>${esc(kid)}、よいウンチがたくさん出たね！</p>${reward?`<p class="reward">ごほうび：<b>${esc(reward)}</b></p>`:'<p class="note">「スタンプカード」でごほうびを決めておくと、ここに表示されます。</p>'}`); });
     } else {
       queue.push(()=>toast(`スタンプゲット！あと${10-inCard}こ`));
@@ -1066,14 +1076,14 @@ function renderMoti(){
   const n=goodCount(kid);
   const card = n===0 ? 1 : Math.floor((n-1)/10)+1;
   const inCard = n===0 ? 0 : ((n-1)%10)+1;
-  const reward = lsGet(rewardKey(kid))||"";
+  const reward = getReward(kid);
   $("stampGrid").innerHTML = Array.from({length:10},(_,i)=>`<div class="stamp">${stampSVG(i<inCard, i+1)}</div>`).join("");
   $("stampTitle").textContent = `${kid}のスタンプカード（${card}枚目）`;
   $("stampInfo").innerHTML = inCard===10 ? `<b>10こ達成！</b>${reward?`ごほうび：<b>${esc(reward)}</b>`:""}　次のよいウンチから新しいカードです。`
     : `よいウンチ（バナナ・半ねり／黄色〜黄土色）でスタンプ1こ。あと<b>${10-inCard}こ</b>${reward?`で「${esc(reward)}」`:""}！`;
   if(document.activeElement!==$("rewardIn")) $("rewardIn").value = reward;
 }
-$("rewardIn").onchange=()=>{ lsSet(rewardKey(currentKid), $("rewardIn").value.trim().slice(0,30)); toast("ごほうびを保存しました"); renderMoti(); };
+$("rewardIn").onchange=()=>{ setReward(currentKid, $("rewardIn").value.trim().slice(0,30)); toast("ごほうびを保存しました"); renderMoti(); };
 
 function renderBadges(){
   const s=streakInfo(currentKid);
@@ -1151,7 +1161,7 @@ function b64urlFromBytes(bytes){ let bin=""; for(let i=0;i<bytes.length;i+=0x800
 function bytesFromB64url(s){ s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="="; const bin=atob(s); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
 async function pipe(bytes, stream){ const r = new Blob([bytes]).stream().pipeThrough(stream); return new Uint8Array(await new Response(r).arrayBuffer()); }
 async function makeCode(){
-  const payload = {v:1, children:state.children, entries:state.entries, meals:state.meals.map(m=>Object.assign({},m,{thumb:""})), deleted:state.deleted};
+  const payload = {v:1, children:state.children, entries:state.entries, meals:state.meals.map(m=>Object.assign({},m,{thumb:""})), rewards:state.rewards, deleted:state.deleted};
   const raw = new TextEncoder().encode(JSON.stringify(payload));
   if(typeof CompressionStream!=="undefined"){
     try{ return CODE_PREFIX+"z."+b64urlFromBytes(await pipe(raw, new CompressionStream("deflate-raw"))); }catch(e){}
@@ -1203,6 +1213,7 @@ function mergeIn(o){
   });
   for(const [id,m] of mm){ if(del[id] && del[id] >= (m.at||0)) mm.delete(id); }
   state.meals=[...mm.values()];
+  if(o.rewards && typeof o.rewards==="object"){ Object.entries(o.rewards).forEach(([k,v])=>{ if(typeof v==="string" && !state.rewards[k]) state.rewards[k]=v.slice(0,30); }); }
   if(!state.children.includes(currentKid)) currentKid=state.children[0];
   save(); renderAll();
   return {added, updated, removed};
@@ -1336,10 +1347,22 @@ async function connectFamily(fid, mode){ // mode: "create" | "join" | "resume"
     }
     renderAll();
   }, err=>{ cloudErr(err); }));
-  let firstFam = true;
+  let firstFam = true, rwDone = false;
   unsubs.push(fs.onSnapshot(famRef, snap=>{
     if(!snap.exists()) return;
     const d = snap.data()||{};
+    const firstRw = !rwDone; rwDone = true;
+    if(d.rewards && typeof d.rewards==="object"){
+      const r={}; Object.entries(d.rewards).forEach(([k,v])=>{ if(typeof v==="string") r[k]=v; });
+      if(firstRw){ // この端末で決めていたごほうびを家族データへ
+        const add={}; state.children.concat(localKids).forEach(k=>{ const v=getReward(k); if(v && !(k in r)) add[k]=v; });
+        if(Object.keys(add).length){ Object.assign(r,add); fs.setDoc(famRef,{rewards:r},{merge:true}).catch(cloudErr); }
+      }
+      state.rewards=r;
+    } else if(firstRw){
+      const add={}; state.children.concat(localKids).forEach(k=>{ const v=getReward(k); if(v) add[k]=v; });
+      if(Object.keys(add).length){ state.rewards=add; fs.setDoc(famRef,{rewards:add},{merge:true}).catch(cloudErr); }
+    }
     let kids = Array.isArray(d.children) ? d.children.filter(c=>typeof c==="string"&&c) : [];
     if(firstFam && mode!=="resume"){
       firstFam=false;
