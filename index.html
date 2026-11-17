@@ -88,7 +88,7 @@ textarea{min-height:60px;resize:vertical}
 .legend{font-size:11.5px;color:var(--sub);margin-top:8px;line-height:1.6}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .chips .chip{font-size:13.5px;padding:7px 12px}
-.photo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:14px;padding:16px;cursor:pointer;background:#fffaf3;color:var(--sub);font-size:15px;min-height:90px}
+.photo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:14px;padding:16px;background:#fffaf3;color:var(--sub);font-size:15px;min-height:90px}
 .photo img{max-width:100%;max-height:220px;border-radius:10px}
 .radarWrap{display:flex;justify-content:center;margin:6px 0}
 .entry .thumb{width:56px;height:56px;border-radius:10px;object-fit:cover;flex:none;background:#faf6f0;display:flex;align-items:center;justify-content:center;font-size:24px}
@@ -208,7 +208,11 @@ pre.exp{white-space:pre-wrap;font-size:12px;background:#faf6f0;border-radius:10p
       <div class="lbl">どの食事？</div>
       <div class="seg" id="mType"></div>
       <div class="lbl">写真</div>
-      <label class="photo"><input type="file" id="mPhoto" accept="image/*" hidden><img id="mPreview" class="hide" alt=""><span id="mPhotoTxt">📷 写真を撮る・選ぶ</span></label>
+      <div class="photo" id="mPhotoBox"><img id="mPreview" class="hide" alt=""><span id="mPhotoTxt">食事の写真を撮るか、選んでください</span></div>
+      <div class="row" style="margin-top:8px">
+        <label class="btn sub" style="margin-top:0;text-align:center">📷 カメラで撮る<input type="file" id="mCamera" accept="image/*" capture="environment" hidden></label>
+        <label class="btn sub" style="margin-top:0;text-align:center">🖼 写真を選ぶ<input type="file" id="mPhoto" accept="image/*" hidden></label>
+      </div>
       <button class="btn" id="mAnalyze" disabled>AIで栄養をチェック</button>
       <p class="note" id="mAiMsg"></p>
       <p class="note hide" id="mNoAi">写真のAI分析は「家族で共有」の設定がされたサイトで使えます。下で食べたものを選んで記録できます。</p>
@@ -811,7 +815,7 @@ async function analyzeMeal(dataUrl){
 // 入力フォーム
 const meal = {type:null, photo:null, thumb:null, scores:null, foods:[], comment:"", groups:new Set(), src:""};
 function defaultMealType(){ const h=new Date().getHours(); return h<10?"b":h<15?"l":h<17?"s":"d"; }
-function resetMeal(){ meal.photo=null; meal.thumb=null; meal.scores=null; meal.foods=[]; meal.comment=""; meal.groups=new Set(); meal.src=""; $("mMemo").value=""; $("mAiMsg").textContent=""; $("mPhoto").value=""; }
+function resetMeal(){ meal.photo=null; meal.thumb=null; meal.scores=null; meal.foods=[]; meal.comment=""; meal.groups=new Set(); meal.src=""; $("mMemo").value=""; $("mAiMsg").textContent=""; $("mPhoto").value=""; $("mCamera").value=""; }
 function renderMealForm(){
   if(!meal.type) meal.type=defaultMealType();
   $("mType").innerHTML = MEALS.map(x=>`<button class="opt ${meal.type===x.k?"on":""}" data-v="${x.k}">${x.n}</button>`).join("");
@@ -828,7 +832,7 @@ function renderMealForm(){
   });
   $("mPreview").classList.toggle("hide", !meal.thumb);
   if(meal.thumb) $("mPreview").src = meal.thumb;
-  $("mPhotoTxt").textContent = meal.thumb ? "写真を変える" : "📷 写真を撮る・選ぶ";
+  $("mPhotoTxt").classList.toggle("hide", !!meal.thumb);
   $("mAnalyze").classList.toggle("hide", !AI_ON);
   $("mAnalyze").disabled = !meal.photo;
   $("mNoAi").classList.toggle("hide", AI_ON);
@@ -841,7 +845,7 @@ function renderMealForm(){
   } else $("mResult").classList.add("hide");
   $("mSave").disabled = !(meal.scores || meal.thumb);
 }
-$("mPhoto").onchange = async(ev)=>{
+$("mCamera").onchange = $("mPhoto").onchange = async(ev)=>{
   const f = ev.target.files && ev.target.files[0]; if(!f) return;
   try{
     const im = await loadImg(f);
