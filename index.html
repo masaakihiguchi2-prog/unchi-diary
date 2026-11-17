@@ -751,14 +751,22 @@ function radarSVG(scores, opt){
   return `<svg viewBox="${-ex} 0 ${size+ex*2} ${size}" width="${size+ex*2}" height="${size}" xmlns="http://www.w3.org/2000/svg" style="max-width:100%;height:auto">${g}</svg>`;
 }
 
-// 1日分の合計（3食でちょうど満点付近になるよう半分にして合算）
+// 1日分の点数：記録した食事の回数に合わせて「3食とった場合」に換算
+//   主食事（朝・昼・夜）＝ 平均点 × 3食 ÷ 2、おやつ ＝ 点数 ÷ 2 を上乗せ（5点で打ち止め）
+//   → 3食記録した日は従来どおり、1〜2食しか記録していない日も低く出すぎない
 function kidMeals(){ return state.meals.filter(m=>m.child===currentKid); }
 function dayScores(date){
   const ms=kidMeals().filter(m=>m.date===date && m.scores);
   if(!ms.length) return null;
+  const main=ms.filter(m=>m.meal!=="s"), snack=ms.filter(m=>m.meal==="s");
   const s=emptyScores();
-  ms.forEach(m=>NUTS.forEach(n=>{ s[n.k]+=(Number(m.scores[n.k])||0)/2; }));
-  NUTS.forEach(n=>s[n.k]=Math.min(5, Math.round(s[n.k]*10)/10));
+  NUTS.forEach(n=>{
+    const v=x=>Number(x.scores[n.k])||0;
+    let t=0;
+    if(main.length) t += main.reduce((a,m)=>a+v(m),0) / main.length * 3 / 2;
+    t += snack.reduce((a,m)=>a+v(m),0) / 2;
+    s[n.k]=Math.min(5, Math.round(t*10)/10);
+  });
   return s;
 }
 
@@ -907,7 +915,7 @@ const MEAL_ORDER={b:0,l:1,s:2,d:3};
 function mealsOn(date){ return kidMeals().filter(m=>m.date===date).sort((a,b)=>(MEAL_ORDER[a.meal]-MEAL_ORDER[b.meal])||(a.at-b.at)); }
 function dayMealBlock(date){
   const ms=mealsOn(date); if(!ms.length) return "";
-  return `<div class="lbl">この日の栄養バランス（${ms.length}食）</div><div class="radarWrap">${radarSVG(dayScores(date),{size:240})}</div>` + ms.map(mealHTML).join("");
+  return `<div class="lbl">この日の栄養バランス（${ms.length}回の記録・3食に換算）</div><div class="radarWrap">${radarSVG(dayScores(date),{size:240})}</div>` + ms.map(mealHTML).join("");
 }
 function renderMealDay(){
   const d=$("mDate").value||todayStr();
