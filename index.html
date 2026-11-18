@@ -783,7 +783,20 @@ function resizeImg(im,max,q){
 let appP=null, aiP=null;
 function loadApp(){
   if(appP) return appP;
-  appP = import(FB_BASE+"firebase-app.js").then(m=>m.getApps().length ? m.getApp() : m.initializeApp(window.UNCHI_FIREBASE_CONFIG));
+  appP = (async()=>{
+    const m = await import(FB_BASE+"firebase-app.js");
+    if(m.getApps().length) return m.getApp();
+    const app = m.initializeApp(window.UNCHI_FIREBASE_CONFIG);
+    // App Check（AI分析に必須）：reCAPTCHA Enterprise のサイトキーが設定されていれば有効化
+    const key = window.UNCHI_APPCHECK_SITE_KEY;
+    if(key){
+      try{
+        const ac = await import(FB_BASE+"firebase-app-check.js");
+        ac.initializeAppCheck(app, {provider: new ac.ReCaptchaEnterpriseProvider(key), isTokenAutoRefreshEnabled: true});
+      }catch(e){ console.warn("App Check", e); }
+    }
+    return app;
+  })();
   appP.catch(()=>{ appP=null; });
   return appP;
 }
@@ -793,7 +806,7 @@ function loadAI(){
   aiP.catch(()=>{ aiP=null; });
   return aiP;
 }
-const AI_MODELS = window.UNCHI_AI_MODELS || ["gemini-3.6-flash","gemini-3-flash","gemini-2.5-flash"];
+const AI_MODELS = window.UNCHI_AI_MODELS || ["gemini-3.6-flash","gemini-3.8-flash","gemini-3.5-flash"];
 const AI_PROMPT = `あなたは子どもの食事を見る管理栄養士です。写真の食事（1食分）に写っている料理・食材を推定し、この1食で次の8項目がどのくらい摂れるかを0〜5の整数で評価してください（0=ほぼなし、3=適度、5=たっぷり）。
 fiber=食物繊維、mineral=ミネラル、protein=たんぱく質、carb=炭水化物、fat=脂質、water=水分（汁物・飲み物・果物や野菜の水分）、vitamin=ビタミン、ferment=発酵食品（みそ汁・納豆・ヨーグルト・チーズ・漬物など。しょうゆ等の調味料だけなら1）。
 次の形式のJSONだけを返してください。
@@ -814,7 +827,7 @@ async function analyzeMeal(dataUrl){
     }catch(e){
       lastErr=e;
       const msg=String(e&&e.message||e);
-      if(!/not found|404|not supported|unsupported|model/i.test(msg)) break; // モデル名以外のエラーは打ち切り
+      if(!/not found|404|not supported|unsupported/i.test(msg)) break; // モデル名以外のエラーは打ち切り
     }
   }
   throw lastErr||new Error("ai");
@@ -880,7 +893,12 @@ $("mAnalyze").onclick = async()=>{
     }
   }catch(e){
     console.warn(e);
-    $("mAiMsg").textContent="AIで読み取れませんでした（通信やAIの設定を確認してください）。下の「写真なしで入力」からも記録できます。";
+    const em=String((e&&(e.code||""))+" "+(e&&e.message||e)).trim();
+    let why="通信やAIの設定を確認してください";
+    if(/app.?check|appcheck|attestation|401|unauthenticated/i.test(em)) why="AIの利用に必要な「App Check」の設定が必要です";
+    else if(/429|quota|resource.?exhausted|rate/i.test(em)) why="今日のAI分析の無料枠を使い切った可能性があります。時間をおいて試してください";
+    else if(/404|not found/i.test(em)) why="AIのモデルが見つかりません";
+    $("mAiMsg").innerHTML=`AIで読み取れませんでした（${esc(why)}）。下の「写真なしで入力」からも記録できます。<br><span style="font-size:11px;color:#a8988a">エラー内容：${esc(em.slice(0,160))}</span>`;
   }
   renderMealForm();
 };

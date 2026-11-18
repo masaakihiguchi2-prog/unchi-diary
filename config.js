@@ -7,3 +7,6 @@ window.UNCHI_FIREBASE_CONFIG = {
   messagingSenderId: "76697637571",
   appId: "1:76697637571:web:26cd735c08b67763e98876"
 };
+
+// App Check（reCAPTCHA Enterprise のサイトキー）。AI分析に必要です。
+window.UNCHI_APPCHECK_SITE_KEY = "";
