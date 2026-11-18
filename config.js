@@ -9,4 +9,4 @@ window.UNCHI_FIREBASE_CONFIG = {
 };
 
 // App Check（reCAPTCHA Enterprise のサイトキー）。AI分析に必要です。
-window.UNCHI_APPCHECK_SITE_KEY = "";
+window.UNCHI_APPCHECK_SITE_KEY = "6Ld-eSYuAAAAAE5kP-ZHU4Wo5o4vHUyYBisSP5SU";
